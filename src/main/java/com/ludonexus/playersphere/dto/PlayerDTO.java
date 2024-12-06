@@ -9,7 +9,7 @@ import lombok.Data;
 
 @Data
 public class PlayerDTO {
-    @NotNull
+    //@NotNull
     private Long id;
 
     @Size(min = 3, message = "Username is too short.")

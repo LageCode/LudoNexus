@@ -27,7 +27,7 @@ public class PlayerService {
 		}
 		
 		Player player = new Player();
-		BeanUtils.copyProperties(playerDTO, player, "id");
+		BeanUtils.copyProperties(playerDTO, player);
 		
 		player = repository.save(player);
 		BeanUtils.copyProperties(player, playerDTO);
