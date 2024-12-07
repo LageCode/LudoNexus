@@ -1,6 +1,7 @@
 package com.ludonexus.playersphere.controller;
 
 import com.ludonexus.playersphere.dto.FriendDTO;
+import com.ludonexus.playersphere.dto.FriendshipRequestDTO;
 import com.ludonexus.playersphere.dto.PlayerDTO;
 import com.ludonexus.playersphere.service.PlayerService;
 import jakarta.validation.Valid;
@@ -46,20 +47,36 @@ public class PlayerController {
         return ResponseEntity.noContent().build();
     }
 
-    @PostMapping("/{id}/friends/{friendId}")
-    public ResponseEntity<Void> addFriend(@PathVariable Long id, @PathVariable Long friendId) {
-        service.addFriend(id, friendId);
-        return ResponseEntity.ok().build();
-    }
-
-    @DeleteMapping("/{id}/friends/{friendId}")
-    public ResponseEntity<Void> removeFriend(@PathVariable Long id, @PathVariable Long friendId) {
-        service.removeFriend(id, friendId);
-        return ResponseEntity.noContent().build();
-    }
-
     @GetMapping("/{id}/friends")
     public ResponseEntity<List<FriendDTO>> getFriends(@PathVariable Long id) {
         return ResponseEntity.ok(service.getPlayerById(id).getFriends());
+    }
+
+    @PostMapping("/{id}/friends")
+    public ResponseEntity<Void> addFriends(
+            @PathVariable Long id,
+            @Valid @RequestBody FriendshipRequestDTO request) {
+        if (request.getId() != null) {
+            service.addFriend(id, request.getId());
+        } else {
+            request.getIds().forEach(friendId -> 
+                service.addFriend(id, friendId)
+            );
+        }
+        return ResponseEntity.ok().build();
+    }
+
+    @DeleteMapping("/{id}/friends")
+    public ResponseEntity<Void> removeFriends(
+            @PathVariable Long id,
+            @Valid @RequestBody FriendshipRequestDTO request) {
+        if (request.getId() != null) {
+            service.removeFriendShip(id, request.getId());
+        } else {
+            request.getIds().forEach(friendId -> 
+                service.removeFriendShip(id, friendId)
+            );
+        }
+        return ResponseEntity.noContent().build();
     }
 }

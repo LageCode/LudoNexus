@@ -31,8 +31,10 @@ public class PlayerService {
 		}
 		
 		Player player = new Player();
-		BeanUtils.copyProperties(playerDTO, player);
+		BeanUtils.copyProperties(playerDTO, player, "id", "totalPoints");
 		
+        playerRepository.save(player);
+
 		return playerToDTO(player);
 	}
 
@@ -71,6 +73,10 @@ public class PlayerService {
     }
 
     public void deletePlayer(Long id) {
+        // friendshipRepository.findByPlayerId(id).forEach(friendship -> {
+        //     removeFriend(friendship.getPlayer().getId(), friendship.getId());
+        // });
+        removeFriendships(id);
         playerRepository.deleteById(id);
     }
 
@@ -89,14 +95,27 @@ public class PlayerService {
         Player friend = playerRepository.findById(friendId)
             .orElseThrow(() -> new IllegalArgumentException("Friend not found"));
 
-        Friendship friendship = new Friendship();
-        friendship.setPlayer(player);
-        friendship.setFriend(friend);
-        friendshipRepository.save(friendship);
+        Friendship friendship1 = new Friendship();
+        friendship1.setPlayer(player);
+        friendship1.setFriend(friend);
+        friendshipRepository.save(friendship1);
+
+        Friendship friendship2 = new Friendship();
+        friendship2.setPlayer(friend);
+        friendship2.setFriend(player);
+        friendshipRepository.save(friendship2);
     }
 
-    public void removeFriend(Long playerId, Long friendId) {
+    public void removeFriendShip(Long playerId, Long friendId) {
         friendshipRepository.deleteByPlayerIdAndFriendId(playerId, friendId);
+        friendshipRepository.deleteByPlayerIdAndFriendId(friendId, playerId);
+    }
+
+    public void removeFriendships(Long playerId) {
+        // friendshipRepository.deleteByPlayerId(playerId);
+        // friendshipRepository.deleteByFriendId(playerId);
+        // refactored by 
+        friendshipRepository.deleteByPlayerIdOrFriendId(playerId, playerId);
     }
 
     public PlayerDTO playerToDTO(Player player) {
