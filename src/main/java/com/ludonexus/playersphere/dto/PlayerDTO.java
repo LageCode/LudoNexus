@@ -1,5 +1,8 @@
 package com.ludonexus.playersphere.dto;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.PositiveOrZero;
@@ -23,4 +26,6 @@ public class PlayerDTO {
 
     @PositiveOrZero(message = "Total Points can't be negative.")        // or Min(0) or Size ...
     private Integer totalPoints = 0;
+
+    private List<FriendDTO> friends = new ArrayList<>();
 }
