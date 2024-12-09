@@ -6,18 +6,18 @@ import jakarta.validation.constraints.AssertTrue;
 import lombok.Data;
 
 @Data
-public class FriendshipRequestDTO {
+public class PlayerFriendshipRequestDTO {
     private Long id;
     private List<Long> ids;
 
     @AssertTrue(message = "Either 'id' or 'ids' must be provided, but not both")
     private boolean isValid() {
         if (id == null && (ids == null || ids.isEmpty())) {
-            return false; // Aucun des deux n'est fourni
+            return false; // No one
         }
         if (id != null && ids != null && !ids.isEmpty()) {
-            return false; // Les deux sont fournis
+            return false; // Both 
         }
-        return true; // L'un ou l'autre est fourni
+        return true; // One or the other (XOR)
     }
 }
