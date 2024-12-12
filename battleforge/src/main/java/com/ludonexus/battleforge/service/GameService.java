@@ -10,6 +10,7 @@ import com.ludonexus.battleforge.dto.GameDTO;
 import com.ludonexus.battleforge.dto.GameParticipationDTO;
 import com.ludonexus.battleforge.dto.UpdateParticipationWithScoreRequestDTO;
 import com.ludonexus.battleforge.model.Game;
+import com.ludonexus.battleforge.model.GameType;
 import com.ludonexus.battleforge.model.Participation;
 import com.ludonexus.battleforge.repository.GameRepository;
 import com.ludonexus.battleforge.repository.ParticipationRepository;
@@ -26,7 +27,12 @@ public class GameService {
 
    public GameDTO createGame(GameDTO gameDTO) {
        Game game = new Game();
+
+        System.out.println(gameDTO.getGameType());
+
        BeanUtils.copyProperties(gameDTO, game, "id", "maxScore", "participation");
+
+       //game.setGameType(GameType.valueOf(gameDTO.getGameType()));
 
        Participation hostParticipation = new Participation();
        hostParticipation.setGame(game);
@@ -59,13 +65,14 @@ public class GameService {
         .orElseThrow(() -> new IllegalArgumentException("Game not found"));
 
     BeanUtils.copyProperties(gameDTO, game, "id");   
+    //game.setGameType(GameType.valueOf(gameDTO.getGameType()));
     game = gameRepository.save(game);
     return gameToDTO(game);
 }
 
    public void deleteGame(Long gameId) {
        gameRepository.deleteById(gameId);
-       removeGameParticipations(gameId);
+    //    removeGameParticipations(gameId); not necessary thanks to jpa cascade feature
    }
 
    public GameParticipationDTO updateParticipation(Long gameId, UpdateParticipationWithScoreRequestDTO participationRequestDTO) {
@@ -103,38 +110,25 @@ public class GameService {
    }
 
    public void removeGameParticipations(Long gameId) {
-       participationRepository.deleteByGameId(gameId);
-       updateGameMaxScore(gameId);
+        // participationRepository.deleteByGameId(gameId);
+        Game game = gameRepository.findById(gameId)
+           .orElseThrow(() -> new IllegalArgumentException("Game not found"));
+
+        game.setParticipations(new ArrayList<>());
+        game.updateMaxScore();
+        gameRepository.save(game);
    }
 
    public void removePlayerParticipations(Long playerId) {
-       List<Game> hostedGames = gameRepository.findAllByHostId(playerId);
-       for (Game game : hostedGames) {
-           game.setHostId(null);
-           gameRepository.save(game);
-       }
-
-       participationRepository.deleteByPlayerId(playerId);
-   }
-
-   private void updateGameMaxScore(Long gameId) {
-       Game game = gameRepository.findById(gameId)
-           .orElseThrow(() -> new IllegalArgumentException("Game not found"));
-
-       Integer maxScore = 0;
-       for (Participation participation : game.getParticipations()) {
-           if (participation.getScore() != null && participation.getScore() > maxScore) {
-               maxScore = participation.getScore();
-           }
-       }
-
-       game.setMaxScore(maxScore);
-       gameRepository.save(game);
+        gameRepository.deleteByHostId(playerId);
+        participationRepository.deleteByPlayerId(playerId);
    }
 
    private GameDTO gameToDTO(Game game) {
        GameDTO gDTO = new GameDTO();
        BeanUtils.copyProperties(game, gDTO, "participations");
+
+       //gDTO.setGameType(game.getGameType().name());
 
        List<GameParticipationDTO> participationDTOs = new ArrayList<>();
        for (Participation participation : game.getParticipations()) {

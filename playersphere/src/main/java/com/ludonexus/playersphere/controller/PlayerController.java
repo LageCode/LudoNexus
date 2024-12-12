@@ -1,8 +1,8 @@
 package com.ludonexus.playersphere.controller;
 
-import com.ludonexus.playersphere.dto.PlayerFriendshipRequestDTO;
-import com.ludonexus.playersphere.dto.PlayerUpdateDTO;
-import com.ludonexus.playersphere.dto.PlayerCreationDTO;
+import com.ludonexus.playersphere.dto.CreateFriendshipRequestDTO;
+import com.ludonexus.playersphere.dto.UpdatePlayerRequestDTO;
+import com.ludonexus.playersphere.dto.CreatePlayerRequestDTO;
 import com.ludonexus.playersphere.dto.PlayerDTO;
 import com.ludonexus.playersphere.dto.PlayerFriendDTO;
 import com.ludonexus.playersphere.service.PlayerService;
@@ -21,7 +21,7 @@ public class PlayerController {
     private final PlayerService service;
 
     @PostMapping
-    public ResponseEntity<PlayerDTO> createPlayer(@Valid @RequestBody PlayerCreationDTO playerCreationDTO) {
+    public ResponseEntity<PlayerDTO> createPlayer(@Valid @RequestBody CreatePlayerRequestDTO playerCreationDTO) {
         // @Valid checks PlayerDTO constraints
         // @Requestbody thanks to @RestController makes request body accessible through playerDTO variable
         return ResponseEntity.ok(service.createPlayer(playerCreationDTO));
@@ -39,7 +39,7 @@ public class PlayerController {
 
     @PutMapping("/{id}")
     public ResponseEntity<PlayerDTO> updatePlayer(@PathVariable Long id,
-            @Valid @RequestBody PlayerUpdateDTO updateDTO) {
+            @Valid @RequestBody UpdatePlayerRequestDTO updateDTO) {
         return ResponseEntity.ok(service.updatePlayer(id, updateDTO));
     }
 
@@ -57,28 +57,28 @@ public class PlayerController {
     @PostMapping("/{id}/friends")
     public ResponseEntity<Void> addFriends(
             @PathVariable Long id,
-            @Valid @RequestBody PlayerFriendshipRequestDTO request) {
-        if (request.getId() != null) {
-            service.createFriendship(id, request.getId());
-        } else {
-            request.getIds().forEach(friendId -> 
-                service.createFriendship(id, friendId)
-            );
-        }
-        return ResponseEntity.ok().build();
+            @Valid @RequestBody CreateFriendshipRequestDTO friendshipRequestDTO) {
+                if (friendshipRequestDTO.getId() != null) {
+                    service.createFriendship(id, friendshipRequestDTO.getId());
+                } else {
+                    friendshipRequestDTO.getIds().forEach(friendId -> 
+                        service.createFriendship(id, friendId)
+                    );
+                }
+                return ResponseEntity.ok().build();
     }
 
     @DeleteMapping("/{id}/friends")
     public ResponseEntity<Void> removeFriends(
             @PathVariable Long id,
-            @Valid @RequestBody PlayerFriendshipRequestDTO request) {
-        if (request.getId() != null) {
-            service.deleteFriendShip(id, request.getId());
-        } else {
-            request.getIds().forEach(friendId -> 
-                service.deleteFriendShip(id, friendId)
-            );
-        }
-        return ResponseEntity.noContent().build();
+            @Valid @RequestBody CreateFriendshipRequestDTO friendshipRequestDTO) {
+                if (friendshipRequestDTO.getId() != null) {
+                    service.deleteFriendShip(id, friendshipRequestDTO.getId());
+                } else {
+                    friendshipRequestDTO.getIds().forEach(friendId -> 
+                        service.deleteFriendShip(id, friendId)
+                    );
+                }
+                return ResponseEntity.noContent().build();
     }
 }

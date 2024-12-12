@@ -6,7 +6,7 @@ import jakarta.validation.constraints.AssertTrue;
 import lombok.Data;
 
 @Data
-public class PlayerFriendshipRequestDTO {
+public class CreateFriendshipRequestDTO {
     private Long id;
     private List<Long> ids;
 

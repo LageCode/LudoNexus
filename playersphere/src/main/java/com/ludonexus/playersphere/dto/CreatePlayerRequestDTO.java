@@ -6,7 +6,7 @@ import jakarta.validation.constraints.Size;
 import lombok.Data;
 
 @Data
-public class PlayerCreationDTO {
+public class CreatePlayerRequestDTO {
 	@Size(min = 3, message = "Username is too short.")
     @Size(max = 16, message = "Username is too long.") 
     private String username;

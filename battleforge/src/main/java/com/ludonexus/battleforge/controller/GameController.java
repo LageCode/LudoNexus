@@ -16,7 +16,6 @@ import com.ludonexus.battleforge.dto.GameDTO;
 import com.ludonexus.battleforge.dto.IdRequestDTO;
 import com.ludonexus.battleforge.dto.GameParticipationDTO;
 import com.ludonexus.battleforge.dto.UpdateParticipationWithScoreRequestDTO;
-import com.ludonexus.battleforge.model.Participation;
 import com.ludonexus.battleforge.service.GameService;
 
 import jakarta.validation.Valid;

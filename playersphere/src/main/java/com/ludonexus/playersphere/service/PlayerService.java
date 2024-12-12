@@ -1,9 +1,9 @@
 package com.ludonexus.playersphere.service;
 
-import com.ludonexus.playersphere.dto.PlayerCreationDTO;
+import com.ludonexus.playersphere.dto.CreatePlayerRequestDTO;
 import com.ludonexus.playersphere.dto.PlayerDTO;
 import com.ludonexus.playersphere.dto.PlayerFriendDTO;
-import com.ludonexus.playersphere.dto.PlayerUpdateDTO;
+import com.ludonexus.playersphere.dto.UpdatePlayerRequestDTO;
 import com.ludonexus.playersphere.model.Friendship;
 import com.ludonexus.playersphere.model.Player;
 import com.ludonexus.playersphere.repository.FriendshipRepository;
@@ -25,7 +25,7 @@ public class PlayerService {
     private final PlayerRepository playerRepository;
     private final FriendshipRepository friendshipRepository;
 
-    public PlayerDTO createPlayer(PlayerCreationDTO creationDTO) {
+    public PlayerDTO createPlayer(CreatePlayerRequestDTO creationDTO) {
 		if (playerRepository.existsByUsername(creationDTO.getUsername())) {
 			throw new IllegalArgumentException("Username already exists");
 		}
@@ -55,7 +55,7 @@ public class PlayerService {
         return convertToDTO(player);
     }
 
-    public PlayerDTO updatePlayer(Long id, PlayerUpdateDTO updateDTO) {
+    public PlayerDTO updatePlayer(Long id, UpdatePlayerRequestDTO updateDTO) {
         Player player = playerRepository.findById(id)
             .orElseThrow(() -> new IllegalArgumentException("Player not found"));
             
@@ -125,7 +125,7 @@ public class PlayerService {
         PlayerDTO playerDTO = new PlayerDTO();
         BeanUtils.copyProperties(player, playerDTO);
 
-        if (playerDTO.getFriends() != null && !playerDTO.getFriends().isEmpty()) {
+        if (player.getFriendships() != null && !player.getFriendships().isEmpty()) {
             // TODO
             List<PlayerFriendDTO> friendDTOs = player.getFriendships().stream()
                 .map(friendship -> {

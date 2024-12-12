@@ -10,4 +10,5 @@ import com.ludonexus.battleforge.model.Game;
 public interface GameRepository extends ListCrudRepository<Game, Long> {
 	Optional<Game> getGameById(Long gameId);
 	List<Game> findAllByHostId(Long hostId);
+	void deleteByHostId(Long hostId);
 }
