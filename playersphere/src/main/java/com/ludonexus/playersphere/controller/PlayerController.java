@@ -1,16 +1,19 @@
 package com.ludonexus.playersphere.controller;
 
-import com.ludonexus.playersphere.dto.CreateFriendshipRequestDTO;
-import com.ludonexus.playersphere.dto.UpdatePlayerRequestDTO;
-import com.ludonexus.playersphere.dto.CreatePlayerRequestDTO;
 import com.ludonexus.playersphere.dto.PlayerDTO;
-import com.ludonexus.playersphere.dto.PlayerFriendDTO;
+import com.ludonexus.playersphere.dto.PlayerIdRequestDTO;
+import com.ludonexus.playersphere.dto.PlayerPointsRequestDTO;
+import com.ludonexus.playersphere.exception.InvalidFriendshipException;
+import com.ludonexus.playersphere.exception.PlayerAlreadyExistsException;
+import com.ludonexus.playersphere.exception.PlayerNotFoundException;
 import com.ludonexus.playersphere.service.PlayerService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 
+import java.net.URI;
 import java.util.List;
 
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -18,67 +21,90 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/api/players")
 @RequiredArgsConstructor
 public class PlayerController {
-    private final PlayerService service;
+    private final PlayerService playerService;
 
-    @PostMapping
-    public ResponseEntity<PlayerDTO> createPlayer(@Valid @RequestBody CreatePlayerRequestDTO playerCreationDTO) {
-        // @Valid checks PlayerDTO constraints
-        // @Requestbody thanks to @RestController makes request body accessible through playerDTO variable
-        return ResponseEntity.ok(service.createPlayer(playerCreationDTO));
+    @GetMapping
+    public ResponseEntity<List<PlayerDTO>> getAllPlayers() {
+        try {
+            List<PlayerDTO> players = playerService.getAllPlayers();
+            return players.isEmpty() ? ResponseEntity.noContent().build()
+                                   : ResponseEntity.ok(players);
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().build();
+        }
     }
 
     @GetMapping("/{id}")
     public ResponseEntity<PlayerDTO> getPlayer(@PathVariable Long id) {
-        return ResponseEntity.ok(service.getPlayerById(id));
+        try {
+            return ResponseEntity.ok(playerService.getPlayerById(id));
+        } catch (PlayerNotFoundException e) {
+            return ResponseEntity.notFound().build();
+        }
     }
 
-    @GetMapping
-    public ResponseEntity<List<PlayerDTO>> getAllPlayers() { return ResponseEntity.ok(service.getAllPlayers()); }
-
-    /* Endpoints for get, update and delete are the same, that's the request type that defines the action to apply on specififed resource */
+    @PostMapping
+    public ResponseEntity<PlayerDTO> createPlayer(@Valid @RequestBody PlayerDTO playerDTO) {
+        try {
+            PlayerDTO created = playerService.createPlayer(playerDTO);
+            return ResponseEntity
+                .created(URI.create("/api/players/" + created.getId()))
+                .body(created);
+        } catch (PlayerAlreadyExistsException e) {
+            return ResponseEntity.status(HttpStatus.CONFLICT).build();
+        }
+    }
 
     @PutMapping("/{id}")
-    public ResponseEntity<PlayerDTO> updatePlayer(@PathVariable Long id,
-            @Valid @RequestBody UpdatePlayerRequestDTO updateDTO) {
-        return ResponseEntity.ok(service.updatePlayer(id, updateDTO));
+    public ResponseEntity<PlayerDTO> updatePlayer(@PathVariable Long id, @Valid @RequestBody PlayerDTO playerDTO) {
+        try {
+            return ResponseEntity.ok(playerService.updatePlayer(id, playerDTO));
+        } catch (PlayerNotFoundException e) {
+            return ResponseEntity.notFound().build();
+        } catch (PlayerAlreadyExistsException e) {
+            return ResponseEntity.status(HttpStatus.CONFLICT).build();
+        }
+    }
+
+    @PutMapping("/{id}/points")
+    public ResponseEntity<PlayerDTO> updatePlayerTotalPoints(@PathVariable Long id, @Valid @RequestBody PlayerPointsRequestDTO pointsRequestDTO) {
+        try {
+            return ResponseEntity.ok(playerService.updatePlayerPoints(id, pointsRequestDTO));
+        } catch (PlayerNotFoundException e) {
+            return ResponseEntity.notFound().build();
+        } catch (PlayerAlreadyExistsException e) {
+            return ResponseEntity.status(HttpStatus.CONFLICT).build();
+        }
+    }
+
+    @PostMapping("/{id}/friends")
+    public ResponseEntity<PlayerDTO> addFriend(@PathVariable Long id, @Valid @RequestBody PlayerIdRequestDTO request) {
+        try {
+            return ResponseEntity.ok(playerService.addFriend(id, request.getPlayerId()));
+        } catch (PlayerNotFoundException e) {
+            return ResponseEntity.notFound().build();
+        } catch (InvalidFriendshipException e) {
+            return ResponseEntity.badRequest().build();
+        }
+    }
+
+    @DeleteMapping("/{id}/friends")
+    public ResponseEntity<Void> removeFriend(@PathVariable Long id, @Valid @RequestBody PlayerIdRequestDTO request) {
+        try {
+            playerService.removeFriend(id, request.getPlayerId());
+            return ResponseEntity.noContent().build();
+        } catch (PlayerNotFoundException e) {
+            return ResponseEntity.notFound().build();
+        }
     }
 
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deletePlayer(@PathVariable Long id) {
-        service.deletePlayer(id);
-        return ResponseEntity.noContent().build();
-    }
-
-    @GetMapping("/{id}/friends")
-    public ResponseEntity<List<PlayerFriendDTO>> getFriends(@PathVariable Long id) {
-        return ResponseEntity.ok(service.getPlayerById(id).getFriends());
-    }
-
-    @PostMapping("/{id}/friends")
-    public ResponseEntity<Void> addFriends(
-            @PathVariable Long id,
-            @Valid @RequestBody CreateFriendshipRequestDTO friendshipRequestDTO) {
-                if (friendshipRequestDTO.getId() != null) {
-                    service.createFriendship(id, friendshipRequestDTO.getId());
-                } else {
-                    friendshipRequestDTO.getIds().forEach(friendId -> 
-                        service.createFriendship(id, friendId)
-                    );
-                }
-                return ResponseEntity.ok().build();
-    }
-
-    @DeleteMapping("/{id}/friends")
-    public ResponseEntity<Void> removeFriends(
-            @PathVariable Long id,
-            @Valid @RequestBody CreateFriendshipRequestDTO friendshipRequestDTO) {
-                if (friendshipRequestDTO.getId() != null) {
-                    service.deleteFriendShip(id, friendshipRequestDTO.getId());
-                } else {
-                    friendshipRequestDTO.getIds().forEach(friendId -> 
-                        service.deleteFriendShip(id, friendId)
-                    );
-                }
-                return ResponseEntity.noContent().build();
+        try {
+            playerService.deletePlayer(id);
+            return ResponseEntity.noContent().build();
+        } catch (PlayerNotFoundException e) {
+            return ResponseEntity.notFound().build();
+        }
     }
 }

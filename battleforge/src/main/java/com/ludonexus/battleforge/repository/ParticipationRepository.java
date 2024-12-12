@@ -11,6 +11,7 @@ public interface ParticipationRepository extends ListCrudRepository<Participatio
 	boolean existsByGameIdAndPlayerId(Long gameId, Long playerId);
 	Optional<Participation> getByGameIdAndPlayerId(Long gameId, Long playerId);
 	List<Participation> findAllByPlayerId(Long playerId);
+	List<Participation> findAllByGameId(Long gameId);
 	void deleteByGameId(Long GameId);
 	void deleteByPlayerId(Long playerId);
 }

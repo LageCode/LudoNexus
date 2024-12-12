@@ -1,5 +1,6 @@
 package com.ludonexus.battleforge.controller;
 
+import java.net.URI;
 import java.util.List;
 
 import org.springframework.http.ResponseEntity;
@@ -13,8 +14,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.ludonexus.battleforge.dto.GameDTO;
-import com.ludonexus.battleforge.dto.IdRequestDTO;
-import com.ludonexus.battleforge.dto.GameParticipationDTO;
+import com.ludonexus.battleforge.dto.ParticipationDTO;
 import com.ludonexus.battleforge.dto.UpdateParticipationWithScoreRequestDTO;
 import com.ludonexus.battleforge.service.GameService;
 
@@ -55,25 +55,20 @@ public class GameController {
     }
 
     @GetMapping("/{id}/participations")
-    public ResponseEntity<List<GameParticipationDTO>> getParticipations(@PathVariable Long id) {
+    public ResponseEntity<List<ParticipationDTO>> getParticipations(@PathVariable Long id) {
         return ResponseEntity.ok(gameService.getGameById(id).getParticipations());
     }
 
     @PostMapping("/{id}/participations")
     public ResponseEntity<Void> addParticipations(
             @PathVariable Long id,
-            @Valid @RequestBody IdRequestDTO idRequestDTO) {
-                if (idRequestDTO.getId() != null) {
-                    gameService.createParticipation(id, idRequestDTO.getId());
-                } else {
-                    idRequestDTO.getIds().forEach(participationId -> 
-                        gameService.createParticipation(id, participationId));
-                }
+            @Valid @RequestBody ParticipationDTO participationDTO) {
+                gameService.createParticipation(id, participationDTO.getPlayerId());
                 return ResponseEntity.ok().build();
     }
 
     @PutMapping("/{id}/participations")
-    public ResponseEntity<GameParticipationDTO> updateParticipation(
+    public ResponseEntity<ParticipationDTO> updateParticipation(
         @PathVariable Long id,
         @Valid @RequestBody UpdateParticipationWithScoreRequestDTO participationRequestDTO) {
             return ResponseEntity.ok(gameService.updateParticipation(id, participationRequestDTO));
@@ -88,14 +83,8 @@ public class GameController {
 
     @DeleteMapping("/ofplayer")
     public ResponseEntity<Void> removePlayerParticipations(
-            @RequestBody IdRequestDTO idRequestDTO) {
-
-                if (idRequestDTO.getId() != null) {
-                    gameService.removePlayerParticipations(idRequestDTO.getId());
-                } else {
-                    idRequestDTO.getIds().forEach(participationId -> 
-                        gameService.removePlayerParticipations(participationId));
-                }
+            @RequestBody ParticipationDTO participationDTO) {
+                gameService.removePlayerParticipations(participationDTO.getPlayerId());
                 return ResponseEntity.noContent().build();
     }
 }

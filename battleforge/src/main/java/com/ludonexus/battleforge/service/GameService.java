@@ -5,12 +5,13 @@ import java.util.List;
 
 import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestTemplate;
 
 import com.ludonexus.battleforge.dto.GameDTO;
-import com.ludonexus.battleforge.dto.GameParticipationDTO;
+import com.ludonexus.battleforge.dto.ParticipationDTO;
+import com.ludonexus.battleforge.dto.PlayerPointsDTO;
 import com.ludonexus.battleforge.dto.UpdateParticipationWithScoreRequestDTO;
 import com.ludonexus.battleforge.model.Game;
-import com.ludonexus.battleforge.model.GameType;
 import com.ludonexus.battleforge.model.Participation;
 import com.ludonexus.battleforge.repository.GameRepository;
 import com.ludonexus.battleforge.repository.ParticipationRepository;
@@ -24,15 +25,12 @@ import lombok.RequiredArgsConstructor;
 public class GameService {
    private final GameRepository gameRepository;
    private final ParticipationRepository participationRepository;
+   private final RestTemplate restTemplate;
+   private static final String PLAYER_API_URL = "http://localhost:8080/api/players/{id}/points";
 
    public GameDTO createGame(GameDTO gameDTO) {
        Game game = new Game();
-
-        System.out.println(gameDTO.getGameType());
-
        BeanUtils.copyProperties(gameDTO, game, "id", "maxScore", "participation");
-
-       //game.setGameType(GameType.valueOf(gameDTO.getGameType()));
 
        Participation hostParticipation = new Participation();
        hostParticipation.setGame(game);
@@ -65,17 +63,16 @@ public class GameService {
         .orElseThrow(() -> new IllegalArgumentException("Game not found"));
 
     BeanUtils.copyProperties(gameDTO, game, "id");   
-    //game.setGameType(GameType.valueOf(gameDTO.getGameType()));
     game = gameRepository.save(game);
     return gameToDTO(game);
 }
 
    public void deleteGame(Long gameId) {
        gameRepository.deleteById(gameId);
-    //    removeGameParticipations(gameId); not necessary thanks to jpa cascade feature
+       removeGameParticipations(gameId);
    }
 
-   public GameParticipationDTO updateParticipation(Long gameId, UpdateParticipationWithScoreRequestDTO participationRequestDTO) {
+   public ParticipationDTO updateParticipation(Long gameId, UpdateParticipationWithScoreRequestDTO participationRequestDTO) {
        Game game = gameRepository.getGameById(gameId)
            .orElseThrow(() -> new IllegalArgumentException("Game not found"));
        
@@ -89,6 +86,9 @@ public class GameService {
 
        BeanUtils.copyProperties(participationRequestDTO, participation);
        participation = participationRepository.save(participation);
+
+       updatePlayerPoints(participation.getPlayerId());
+
        return participationToDTO(participation);
    }
 
@@ -110,39 +110,75 @@ public class GameService {
    }
 
    public void removeGameParticipations(Long gameId) {
-        // participationRepository.deleteByGameId(gameId);
-        Game game = gameRepository.findById(gameId)
-           .orElseThrow(() -> new IllegalArgumentException("Game not found"));
-
-        game.setParticipations(new ArrayList<>());
-        game.updateMaxScore();
-        gameRepository.save(game);
+       participationRepository.deleteByGameId(gameId);
+       updateGameMaxScore(gameId);
    }
 
    public void removePlayerParticipations(Long playerId) {
-        gameRepository.deleteByHostId(playerId);
-        participationRepository.deleteByPlayerId(playerId);
-   }
-
-   private GameDTO gameToDTO(Game game) {
-       GameDTO gDTO = new GameDTO();
-       BeanUtils.copyProperties(game, gDTO, "participations");
-
-       //gDTO.setGameType(game.getGameType().name());
-
-       List<GameParticipationDTO> participationDTOs = new ArrayList<>();
-       for (Participation participation : game.getParticipations()) {
-           participationDTOs.add(participationToDTO(participation));
+       List<Game> hostedGames = gameRepository.findAllByHostId(playerId);
+       for (Game game : hostedGames) {
+           game.setHostId(null);
+           gameRepository.save(game);
        }
-       gDTO.setParticipations(participationDTOs);
 
-       return gDTO;
+       participationRepository.deleteByPlayerId(playerId);
    }
 
-   private GameParticipationDTO participationToDTO(Participation participation) {
-       GameParticipationDTO pDTO = new GameParticipationDTO();
-       BeanUtils.copyProperties(participation, pDTO);
-       pDTO.setGameId(participation.getGame().getId());
-       return pDTO;
+   private void updateGameMaxScore(Long gameId) {
+       Game game = gameRepository.findById(gameId)
+           .orElseThrow(() -> new IllegalArgumentException("Game not found"));
+
+       Integer maxScore = 0;
+       for (Participation participation : game.getParticipations()) {
+           if (participation.getScore() != null && participation.getScore() > maxScore) {
+               maxScore = participation.getScore();
+           }
+       }
+
+       game.setMaxScore(maxScore);
+       gameRepository.save(game);
    }
+
+    private void updatePlayerPoints(Long playerId) {
+        List<Participation> participations = participationRepository.findAllByPlayerId(playerId);
+        
+        int totalPoints = 0;
+        for (Participation p : participations) {
+            if (p.getScore() != null)
+                totalPoints += p.getScore();
+        }
+
+        try {
+            PlayerPointsDTO pointsDTO = new PlayerPointsDTO();
+            pointsDTO.setPoints(totalPoints);
+            
+            restTemplate.put(
+                PLAYER_API_URL,
+                pointsDTO,
+                playerId
+            );
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to update player points", e);
+        }
+    }
+
+    private GameDTO gameToDTO(Game game) {
+        GameDTO gDTO = new GameDTO();
+        BeanUtils.copyProperties(game, gDTO, "participations");
+
+        List<ParticipationDTO> participationDTOs = new ArrayList<>();
+        for (Participation participation : game.getParticipations()) {
+            participationDTOs.add(participationToDTO(participation));
+        }
+        gDTO.setParticipations(participationDTOs);
+
+        return gDTO;
+    }
+
+    private ParticipationDTO participationToDTO(Participation participation) {
+        ParticipationDTO pDTO = new ParticipationDTO();
+        BeanUtils.copyProperties(participation, pDTO);
+        pDTO.setGameId(participation.getGame().getId());
+        return pDTO;
+    }
 }

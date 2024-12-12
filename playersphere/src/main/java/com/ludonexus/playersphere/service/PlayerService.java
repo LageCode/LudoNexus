@@ -1,16 +1,17 @@
 package com.ludonexus.playersphere.service;
 
-import com.ludonexus.playersphere.dto.CreatePlayerRequestDTO;
 import com.ludonexus.playersphere.dto.PlayerDTO;
-import com.ludonexus.playersphere.dto.PlayerFriendDTO;
-import com.ludonexus.playersphere.dto.UpdatePlayerRequestDTO;
+import com.ludonexus.playersphere.dto.PlayerPointsRequestDTO;
+import com.ludonexus.playersphere.exception.InvalidFriendshipException;
+import com.ludonexus.playersphere.exception.PlayerAlreadyExistsException;
+import com.ludonexus.playersphere.exception.PlayerNotFoundException;
+import com.ludonexus.playersphere.dto.FriendDTO;
 import com.ludonexus.playersphere.model.Friendship;
 import com.ludonexus.playersphere.model.Player;
 import com.ludonexus.playersphere.repository.FriendshipRepository;
 import com.ludonexus.playersphere.repository.PlayerRepository;
 import lombok.RequiredArgsConstructor;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -19,128 +20,126 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
-@Transactional      // Ensures that all DB operations succeed or fail together
+@Transactional
 @RequiredArgsConstructor
 public class PlayerService {
     private final PlayerRepository playerRepository;
     private final FriendshipRepository friendshipRepository;
 
-    public PlayerDTO createPlayer(CreatePlayerRequestDTO creationDTO) {
-		if (playerRepository.existsByUsername(creationDTO.getUsername())) {
-			throw new IllegalArgumentException("Username already exists");
-		}
-		if (playerRepository.existsByEmail(creationDTO.getEmail())) {
-			throw new IllegalArgumentException("Email already exists");
-		}
-		
-		Player player = new Player();
-		BeanUtils.copyProperties(creationDTO, player);
-		
-        playerRepository.save(player);
+    public PlayerDTO createPlayer(PlayerDTO playerDTO) {
+        if (playerRepository.existsByUsername(playerDTO.getUsername())) {
+            throw new PlayerAlreadyExistsException("Username already exists: " + playerDTO.getUsername());
+        }
+        if (playerRepository.existsByEmail(playerDTO.getEmail())) {
+            throw new PlayerAlreadyExistsException("Email already exists: " + playerDTO.getEmail());
+        }
 
-		return convertToDTO(player);
-	}
-
-	public List<PlayerDTO> getAllPlayers() {
-        return playerRepository.findAll().stream()
-            .map(player -> {
-                return convertToDTO(player);
-            })
-            .collect(Collectors.toList());
+        Player player = new Player();
+        BeanUtils.copyProperties(playerDTO, player, "id", "friends");
+        player = playerRepository.save(player);
+        return toDTO(player);
     }
 
     public PlayerDTO getPlayerById(Long id) {
-        Player player = playerRepository.findById(id)
-            .orElseThrow(() -> new IllegalArgumentException("Player not found"));
-        return convertToDTO(player);
+        return toDTO(findPlayerById(id));
     }
 
-    public PlayerDTO updatePlayer(Long id, UpdatePlayerRequestDTO updateDTO) {
-        Player player = playerRepository.findById(id)
-            .orElseThrow(() -> new IllegalArgumentException("Player not found"));
-            
-        // Check if new username/email are taken by another player
-        if (!player.getUsername().equals(updateDTO.getUsername()) 
-            && playerRepository.existsByUsername(updateDTO.getUsername())) {
-            throw new IllegalArgumentException("Username already exists");
+    public List<PlayerDTO> getAllPlayers() {
+        return playerRepository.findAll().stream()
+            .map(this::toDTO)
+            .collect(Collectors.toList());
+    }
+
+    public PlayerDTO updatePlayer(Long id, PlayerDTO playerDTO) {
+        Player player = findPlayerById(id);
+        
+        if (!player.getUsername().equals(playerDTO.getUsername()) 
+                && playerRepository.existsByUsername(playerDTO.getUsername())) {
+            throw new PlayerAlreadyExistsException("Username already exists: " + playerDTO.getUsername());
         }
-        if (!player.getEmail().equals(updateDTO.getEmail()) 
-            && playerRepository.existsByEmail(updateDTO.getEmail())) {
-            throw new IllegalArgumentException("Email already exists");
+        if (!player.getEmail().equals(playerDTO.getEmail()) 
+                && playerRepository.existsByEmail(playerDTO.getEmail())) {
+            throw new PlayerAlreadyExistsException("Email already exists: " + playerDTO.getEmail());
         }
 
-        BeanUtils.copyProperties(updateDTO, player, "id");
+        BeanUtils.copyProperties(playerDTO, player, "id", "friends");
         player = playerRepository.save(player);
-
-        return convertToDTO(player);
+        return toDTO(player);
     }
 
-    public void deletePlayer(Long id) {
-        // friendshipRepository.findByPlayerId(id).forEach(friendship -> {
-        //     removeFriend(friendship.getPlayer().getId(), friendship.getId());
-        // });
-        deleteFriendships(id);
-        playerRepository.deleteById(id);
+    public PlayerDTO updatePlayerPoints(Long id, PlayerPointsRequestDTO pointsRequestDTO) {
+        Player player = findPlayerById(id);
+        player.setTotalPoints(pointsRequestDTO.getPoints());
+        player = playerRepository.save(player);
+        return toDTO(player);
     }
 
-     public void createFriendship(Long playerId, Long friendId) {
+    public PlayerDTO addFriend(Long playerId, Long friendId) {
         if (playerId.equals(friendId)) {
-            throw new IllegalArgumentException("A player cannot be friends with themselves");
+            throw new InvalidFriendshipException("Player cannot be friends with themselves");
         }
+
+        Player player = findPlayerById(playerId);
+        Player friend = findPlayerById(friendId);
 
         if (friendshipRepository.existsByPlayerIdAndFriendId(playerId, friendId)) {
-            throw new IllegalArgumentException("Friendship already exists");
+            throw new InvalidFriendshipException("Friendship already exists");
         }
 
-        Player player = playerRepository.findById(playerId)
-            .orElseThrow(() -> new IllegalArgumentException("Player not found"));
-            
-        Player friend = playerRepository.findById(friendId)
-            .orElseThrow(() -> new IllegalArgumentException("Friend not found"));
+        Friendship friendship = new Friendship();
+        friendship.setPlayer(player);
+        friendship.setFriend(friend);
+        friendshipRepository.save(friendship);
 
-        Friendship friendship1 = new Friendship();
-        friendship1.setPlayer(player);
-        friendship1.setFriend(friend);
-        friendshipRepository.save(friendship1);
+        // Create reverse friendship
+        Friendship reverseFriendship = new Friendship();
+        reverseFriendship.setPlayer(friend);
+        reverseFriendship.setFriend(player);
+        friendshipRepository.save(reverseFriendship);
 
-        Friendship friendship2 = new Friendship();
-        friendship2.setPlayer(friend);
-        friendship2.setFriend(player);
-        friendshipRepository.save(friendship2);
+        return toDTO(player);
     }
 
-    public void deleteFriendShip(Long playerId, Long friendId) {
+    public void removeFriend(Long playerId, Long friendId) {
+        if (!playerRepository.existsById(playerId)) {
+            throw new PlayerNotFoundException(playerId);
+        }
+        if (!playerRepository.existsById(friendId)) {
+            throw new PlayerNotFoundException(friendId);
+        }
+        
         friendshipRepository.deleteByPlayerIdAndFriendId(playerId, friendId);
         friendshipRepository.deleteByPlayerIdAndFriendId(friendId, playerId);
     }
 
-    public void deleteFriendships(Long playerId) {
-        // friendshipRepository.deleteByPlayerId(playerId);
-        // friendshipRepository.deleteByFriendId(playerId);
-        // refactored by 
-        friendshipRepository.deleteByPlayerIdOrFriendId(playerId, playerId);
+    public void deletePlayer(Long id) {
+        if (!playerRepository.existsById(id)) {
+            throw new PlayerNotFoundException(id);
+        }
+        friendshipRepository.deleteByPlayerIdOrFriendId(id, id);
+        playerRepository.deleteById(id);
     }
 
-    private PlayerDTO convertToDTO(Player player) {
-        PlayerDTO playerDTO = new PlayerDTO();
-        BeanUtils.copyProperties(player, playerDTO);
+    private Player findPlayerById(Long id) {
+        return playerRepository.findById(id)
+            .orElseThrow(() -> new PlayerNotFoundException(id));
+    }
 
-        if (player.getFriendships() != null && !player.getFriendships().isEmpty()) {
-            // TODO
-            List<PlayerFriendDTO> friendDTOs = player.getFriendships().stream()
+    private PlayerDTO toDTO(Player player) {
+        PlayerDTO dto = new PlayerDTO();
+        BeanUtils.copyProperties(player, dto, "friends");
+        
+        if (player.getFriendships() != null) {
+            dto.setFriends(player.getFriendships().stream()
                 .map(friendship -> {
-                    Player friend = playerRepository.findById(friendship.getFriend().getId())
-                        .orElseThrow(() -> new IllegalStateException("Friend not found: " + friendship.getFriend().getId()));
-
-                PlayerFriendDTO friendDTO = new PlayerFriendDTO();
-                BeanUtils.copyProperties(friend, friendDTO);
-                return friendDTO;
-            }).collect(Collectors.toList());
-            playerDTO.setFriends(friendDTOs);
-        } else {
-            playerDTO.setFriends(new ArrayList<>());
+                    FriendDTO friendDTO = new FriendDTO();
+                    Player friend = friendship.getFriend();
+                    BeanUtils.copyProperties(friend, friendDTO);
+                    return friendDTO;
+                })
+                .collect(Collectors.toList()));
         }
-
-        return playerDTO;
+        
+        return dto;
     }
 }
